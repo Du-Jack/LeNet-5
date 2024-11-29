@@ -11,11 +11,31 @@ void MatrixInit(float *M, int n, int p) {
     }
 }
 
+void MatrixPrint(float *M, int n, int p){
+    for (int i = 0; i < n; i++) {
+        for (int j = 0; j < p; j++) {
+            printf("%.2f ", M[i * p + j]); 
+        }
+        printf("\n"); 
+    }
+}
+
+void MatrixAdd(float *M1, float *M2, float *Mout, int n, int p){
+    for (int i = 0; i < n; i++) {
+        for (int j = 0; j < p; j++) {
+            Mout=; 
+        }
+        printf("\n"); 
+    }
+}
+
 int main() {
     int n = 3, p = 5; 
     float matrix[n * p]; 
 
     MatrixInit(matrix, n, p);
+
+    MatrixPrint(matrix, n, p);
 
     return 0;
 }
