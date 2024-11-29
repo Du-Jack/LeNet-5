@@ -23,19 +23,29 @@ void MatrixPrint(float *M, int n, int p){
 void MatrixAdd(float *M1, float *M2, float *Mout, int n, int p){
     for (int i = 0; i < n; i++) {
         for (int j = 0; j < p; j++) {
-            Mout=; 
+            Mout[i * p + j] = M1[i * p + j] + M2[i * p + j];
         }
-        printf("\n"); 
     }
 }
 
 int main() {
-    int n = 3, p = 5; 
-    float matrix[n * p]; 
+    int n = 3, p = 4;  
 
-    MatrixInit(matrix, n, p);
+    float M1[n * p], M2[n * p], Mout[n * p];
 
-    MatrixPrint(matrix, n, p);
+    MatrixInit(M1, n, p);
+    MatrixInit(M2, n, p);
 
+    printf("Matrice M1 :\n");
+    MatrixPrint(M1, n, p);
+    
+    printf("\nMatrice M2 :\n");
+    MatrixPrint(M2, n, p);
+
+    MatrixAdd(M1, M2, Mout, n, p);
+
+    // Affichage du résultat de l'addition
+    printf("\nM1 + M2:\n");
+    MatrixPrint(Mout, n, p);
     return 0;
 }
