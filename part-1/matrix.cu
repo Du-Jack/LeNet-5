@@ -28,24 +28,94 @@ void MatrixAdd(float *M1, float *M2, float *Mout, int n, int p){
     }
 }
 
-int main() {
-    int n = 3, p = 4;  
+__global__ void cudaMatrixAdd(float *M1, float *M2, float *Mout, int n, int p){
+    int idx = blockIdx.x * blockDim.x + threadIdx.x;
+    int idy = blockIdx.y * blockDim.y + threadIdx.y;
 
+    if (idx < n && idy < p) {
+        int index = idx * p + idy;  
+        Mout[index] = M1[index] + M2[index];  
+    }
+}
+
+
+int main(int argc, char *argv[]) {
+    
+    const char *hardware = "CPU";
+    if (argc > 1) {
+        hardware = argv[1];  
+    }
+
+    int n = 100, p = 500; 
+
+    // Declare CPU memory variables
     float M1[n * p], M2[n * p], Mout[n * p];
-
     MatrixInit(M1, n, p);
     MatrixInit(M2, n, p);
 
-    printf("Matrice M1 :\n");
-    MatrixPrint(M1, n, p);
+    if (strcmp(hardware, "CPU") == 0) {
+        printf("\nOn CPU:\n");
+        // Add matrices on CPU
+        MatrixAdd(M1, M2, Mout, n, p);
+
+        // printf("Matrice M1 :\n");
+        // MatrixPrint(M1, n, p);
     
-    printf("\nMatrice M2 :\n");
-    MatrixPrint(M2, n, p);
+        // printf("\nMatrice M2 :\n");
+        // MatrixPrint(M2, n, p);
 
-    MatrixAdd(M1, M2, Mout, n, p);
+        // printf("\nM1 + M2:\n");
+        // MatrixPrint(Mout, n, p);
+    }
+    else if (strcmp(hardware, "GPU") == 0) {
+        printf("\nOn GPU:\n");
+        // Allocate and initialize host matrices
+        float *M1 = (float *)malloc(n * p * sizeof(float));
+        float *M2 = (float *)malloc(n * p * sizeof(float));
+        float *Mout = (float *)malloc(n * p * sizeof(float));
 
-    // Affichage du résultat de l'addition
-    printf("\nM1 + M2:\n");
-    MatrixPrint(Mout, n, p);
+        MatrixInit(M1, n, p);
+        MatrixInit(M2, n, p);
+
+        // Allocate memory on the GPU
+        float *d_M1, *d_M2, *d_Mout;
+        cudaMalloc((void **)&d_M1, n * p * sizeof(float));
+        cudaMalloc((void **)&d_M2, n * p * sizeof(float));
+        cudaMalloc((void **)&d_Mout, n * p * sizeof(float));
+
+        // Copy data from host to device
+        cudaMemcpy(d_M1, M1, n * p * sizeof(float), cudaMemcpyHostToDevice);
+        cudaMemcpy(d_M2, M2, n * p * sizeof(float), cudaMemcpyHostToDevice);
+
+        // Define block and grid sizes
+        dim3 blockDim(4,4);  
+        dim3 gridSize((p+blockDim.x-1)/blockDim.x, (n + blockDim.y-1)/blockDim.y);
+
+        // Launch kernel
+        cudaMatrixAdd<<<gridSize, blockDim>>>(d_M1, d_M2, d_Mout, n, p);
+        cudaDeviceSynchronize();  
+
+        // Copy result back from device to host
+        cudaMemcpy(Mout, d_Mout, n * p * sizeof(float), cudaMemcpyDeviceToHost);
+
+        // printf("Matrice M1 :\n");
+        // MatrixPrint(h_M1, n, p);
+    
+        // printf("\nMatrice M2 :\n");
+        // MatrixPrint(h_M2, n, p);
+
+        // printf("\nM1 + M2:\n");
+        // MatrixPrint(h_Mout, n, p);
+
+        // Free device memory
+        free(M1);
+        free(M2);
+        free(Mout);
+        cudaFree(d_M1);
+        cudaFree(d_M2);
+        cudaFree(d_Mout);
+    }
+
     return 0;
 }
+
