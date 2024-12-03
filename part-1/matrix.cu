@@ -46,14 +46,24 @@ void MatrixMult(float *M1, float *M2, float *Mout, int n, int p)
 __global__ void cudaMatrixAdd(float *M1, float *M2, float *Mout, int n, int p){
     int idx = blockIdx.x * blockDim.x + threadIdx.x;
     int idy = blockIdx.y * blockDim.y + threadIdx.y;
-
     if (idx < n && idy < p) {
         int index = idx * p + idy;  
         Mout[index] = M1[index] + M2[index];  
     }
 }
 
-__global__ void cudaMatrixAdd(float *M1, float *M2, float *Mout, int n)
+__global__ void cudaMatrixMult(float *M1, float *M2, float *Mout, int n, int p){
+    int idx = blockIdx.x * blockDim.x + threadIdx.x;
+    int idy = blockIdx.y * blockDim.y + threadIdx.y;
+
+    if (idx < n && idy < n) {
+        float value = 0;
+        for (int k = 0; k < n; k++) {
+            value += M1[idx * n + k] * M2[k * n + idy];
+        }
+        Mout[idx * n + idy] = value;
+    }
+}
 
 int main(int argc, char *argv[]) {
     
@@ -79,14 +89,14 @@ int main(int argc, char *argv[]) {
         MatrixMult(M1, M2, Mout, n, p);
         // MatrixPrint(Mout, n, p);
 
-        printf("Matrice M1 :\n");
-        MatrixPrint(M1, n, p);
+        // printf("Matrice M1 :\n");
+        // MatrixPrint(M1, n, p);
     
-        printf("\nMatrice M2 :\n");
-        MatrixPrint(M2, n, p);
+        // printf("\nMatrice M2 :\n");
+        // MatrixPrint(M2, n, p);
 
-        printf("\nM1 * M2:\n");
-        MatrixPrint(Mout, n, p);
+        // printf("\nM1 * M2:\n");
+        // MatrixPrint(Mout, n, p);
     }
     else if (strcmp(hardware, "GPU") == 0) {
         printf("\nOn GPU:\n");
@@ -112,21 +122,21 @@ int main(int argc, char *argv[]) {
         dim3 blockDim(16,16);  
         dim3 gridSize((p+blockDim.x-1)/blockDim.x, (n + blockDim.y-1)/blockDim.y);
 
-        // Launch kernel
-        cudaMatrixAdd<<<gridSize, blockDim>>>(d_M1, d_M2, d_Mout, n, p);
+        // Launch kernel for addition or product
+        cudaMatrixMult<<<gridSize, blockDim>>>(d_M1, d_M2, d_Mout, n, p);
         cudaDeviceSynchronize();  
 
         // Copy result back from device to host
         cudaMemcpy(Mout, d_Mout, n * p * sizeof(float), cudaMemcpyDeviceToHost);
 
         // printf("Matrice M1 :\n");
-        // MatrixPrint(h_M1, n, p);
+        // MatrixPrint(M1, n, p);
     
         // printf("\nMatrice M2 :\n");
-        // MatrixPrint(h_M2, n, p);
+        // MatrixPrint(M2, n, p);
 
-        // printf("\nM1 + M2:\n");
-        // MatrixPrint(h_Mout, n, p);
+        // printf("\nM1 * M2:\n");
+        // MatrixPrint(Mout, n, p);
 
         // Free device memory
         free(M1);
