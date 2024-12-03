@@ -28,6 +28,22 @@ void MatrixAdd(float *M1, float *M2, float *Mout, int n, int p){
     }
 }
 
+void MatrixMult(float *M1, float *M2, float *Mout, int n, int p)
+{
+   // M1 rows
+   for (int i = 0; i < n; i++) {
+       // M2 col
+       for (int j = 0; j < p; j++) {
+           // Initialiser Mout[i * p + j] à zéro avant l'addition
+           Mout[i * p + j] = 0;
+           for (int k = 0; k < p; k++) {
+               Mout[i * p + j] += M1[i * p + k] * M2[k * p + j];
+           }
+       }
+   }
+}
+
+
 __global__ void cudaMatrixAdd(float *M1, float *M2, float *Mout, int n, int p){
     int idx = blockIdx.x * blockDim.x + threadIdx.x;
     int idy = blockIdx.y * blockDim.y + threadIdx.y;
@@ -46,17 +62,21 @@ int main(int argc, char *argv[]) {
         hardware = argv[1];  
     }
 
-    int n = 100, p = 500; 
+    int n = 1000, p = 1000; 
 
     // Declare CPU memory variables
-    float M1[n * p], M2[n * p], Mout[n * p];
+    float M1[n * p], M2[n * p];
     MatrixInit(M1, n, p);
     MatrixInit(M2, n, p);
 
     if (strcmp(hardware, "CPU") == 0) {
+        float *Mout = (float *)malloc(n * p * sizeof(float));
         printf("\nOn CPU:\n");
         // Add matrices on CPU
         MatrixAdd(M1, M2, Mout, n, p);
+
+        MatrixMult(M1, M2, Mout, n, p);
+        // MatrixPrint(Mout, n, p);
 
         // printf("Matrice M1 :\n");
         // MatrixPrint(M1, n, p);
