@@ -109,6 +109,17 @@ __global__ void subsample2D(float *input, float *output, int inputWidth, int inp
     }
 }
 
+__device__ float activation_tanh(float M) {
+    return tanh(M);
+}
+
+__global__ void apply_activation_tanh(float *data, int size) {
+    int idx = blockIdx.x * blockDim.x + threadIdx.x;
+    if (idx < size) {
+        data[idx] = activation_tanh(data[idx]);
+    }
+}
+
 int main(int argc, char *argv[]) {
     int N1 = 32 * 32;  
     int N2 = 6 * 28 * 28;  
@@ -157,15 +168,18 @@ int main(int argc, char *argv[]) {
 
     subsample2D<<<gridDim, blockDim>>>(d_C1_data, d_S1_data, 28, 28, 14, 14);
 
+    apply_activation_tanh<<<(N3 + 255) / 256, 256>>>(d_S1_data, N3);
+
     cudaDeviceSynchronize();
 
     cudaMemcpy(C1_data, d_C1_data, N2 * sizeof(float), cudaMemcpyDeviceToHost);
-
+    cudaMemcpy(S1_data, d_S1_data, N3 * sizeof(float), cudaMemcpyDeviceToHost);
+    
     for (int c = 0; c < 6; c++) {
         printf("Canal %d :\n", c);
         for (int h = 0; h < 14; h++) {
             for (int w = 0; w < 14; w++) {
-                printf("%.2f ", C1_data[c * 14 * 14 + h * 14 + w]);
+                printf("%.2f ", S1_data[c * 14 * 14 + h * 14 + w]);
             }
             printf("\n");
         }
@@ -176,6 +190,10 @@ int main(int argc, char *argv[]) {
     free(C1_data);
     free(S1_data);
     free(C1_kernel);
+    cudaFree(d_raw_data);
+    cudaFree(d_C1_data);
+    cudaFree(d_C1_kernel);
+    cudaFree(d_S1_data);
 
     return 0;
 }
