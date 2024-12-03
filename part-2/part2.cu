@@ -85,6 +85,30 @@ __global__ void convolve_2D(float *raw_data, float *C1_kernel, float *C1_data) {
     }
 }
 
+__global__ void subsample2D(float *input, float *output, int inputWidth, int inputHeight, int outputWidth, int outputHeight) {
+    int c = blockIdx.z;  
+    int h = blockIdx.y * blockDim.y + threadIdx.y; 
+    int w = blockIdx.x * blockDim.x + threadIdx.x;  
+
+    if (h < outputHeight && w < outputWidth) {
+        // Calcul de la position de la fenêtre 2x2 dans l'entrée
+        int input_y = h * 2;
+        int input_x = w * 2;
+        
+        // Moyenne des 4 pixels du bloc 2x2 dans l'entrée
+        float sum = 0.0f;
+        for (int dy = 0; dy < 2; dy++) {
+            for (int dx = 0; dx < 2; dx++) {
+                int input_index = c * inputHeight * inputWidth + (input_y + dy) * inputWidth + (input_x + dx);
+                sum += input[input_index];
+            }
+        }
+
+        int output_index = c * outputHeight * outputWidth + h * outputWidth + w;
+        output[output_index] = sum / 4.0f;  // avg of 4 pixels
+    }
+}
+
 int main(int argc, char *argv[]) {
     int N1 = 32 * 32;  
     int N2 = 6 * 28 * 28;  
@@ -112,27 +136,40 @@ int main(int argc, char *argv[]) {
         C1_kernel[i] = ((float)rand() / RAND_MAX);
     }
 
-    float *d_raw_data, *d_C1_data, *d_C1_kernel;
+    float *d_raw_data, *d_C1_data, *d_C1_kernel, *d_S1_data;
 
     cudaMalloc((void **)&d_raw_data, N1 * sizeof(float));
     cudaMalloc((void **)&d_C1_data, N2 * sizeof(float));
     cudaMalloc((void **)&d_C1_kernel, N4 * sizeof(float));
+    cudaMalloc((void **)&d_S1_data, N3 * sizeof(float));
 
     cudaMemcpy(d_raw_data, raw_data, N1 * sizeof(float), cudaMemcpyHostToDevice);
     cudaMemcpy(d_C1_kernel, C1_kernel, N4 * sizeof(float), cudaMemcpyHostToDevice);
+    cudaMemcpy(d_S1_data, S1_data, N3 * sizeof(float), cudaMemcpyHostToDevice);
+
 
     dim3 blockDim(16, 16); 
-    dim3 gridDim((28 + 16 - 1) / 16,  // Calcul de la grille
+    dim3 gridDim((28 + 16 - 1) / 16,  
                  (28 + 16 - 1) / 16, 
                  6);  // 6 output channel
 
     convolve_2D<<<gridDim, blockDim>>>(d_raw_data, d_C1_kernel, d_C1_data);
 
+    subsample2D<<<gridDim, blockDim>>>(d_C1_data, d_S1_data, 28, 28, 14, 14);
+
     cudaDeviceSynchronize();
 
     cudaMemcpy(C1_data, d_C1_data, N2 * sizeof(float), cudaMemcpyDeviceToHost);
 
-    printf("C1_data[0][0][0] = %f\n", C1_data[0]);
+    for (int c = 0; c < 6; c++) {
+        printf("Canal %d :\n", c);
+        for (int h = 0; h < 14; h++) {
+            for (int w = 0; w < 14; w++) {
+                printf("%.2f ", C1_data[c * 14 * 14 + h * 14 + w]);
+            }
+            printf("\n");
+        }
+    }
 
     // Libération de la mémoire
     free(raw_data);
