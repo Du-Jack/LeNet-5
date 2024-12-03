@@ -43,7 +43,6 @@ void MatrixMult(float *M1, float *M2, float *Mout, int n, int p)
    }
 }
 
-
 __global__ void cudaMatrixAdd(float *M1, float *M2, float *Mout, int n, int p){
     int idx = blockIdx.x * blockDim.x + threadIdx.x;
     int idy = blockIdx.y * blockDim.y + threadIdx.y;
@@ -54,6 +53,7 @@ __global__ void cudaMatrixAdd(float *M1, float *M2, float *Mout, int n, int p){
     }
 }
 
+__global__ void cudaMatrixAdd(float *M1, float *M2, float *Mout, int n)
 
 int main(int argc, char *argv[]) {
     
@@ -62,7 +62,8 @@ int main(int argc, char *argv[]) {
         hardware = argv[1];  
     }
 
-    int n = 1000, p = 1000; 
+    int n = atoi(argv[2]);
+    int p = atoi(argv[3]);
 
     // Declare CPU memory variables
     float M1[n * p], M2[n * p];
@@ -73,19 +74,19 @@ int main(int argc, char *argv[]) {
         float *Mout = (float *)malloc(n * p * sizeof(float));
         printf("\nOn CPU:\n");
         // Add matrices on CPU
-        MatrixAdd(M1, M2, Mout, n, p);
+        // MatrixAdd(M1, M2, Mout, n, p);
 
         MatrixMult(M1, M2, Mout, n, p);
         // MatrixPrint(Mout, n, p);
 
-        // printf("Matrice M1 :\n");
-        // MatrixPrint(M1, n, p);
+        printf("Matrice M1 :\n");
+        MatrixPrint(M1, n, p);
     
-        // printf("\nMatrice M2 :\n");
-        // MatrixPrint(M2, n, p);
+        printf("\nMatrice M2 :\n");
+        MatrixPrint(M2, n, p);
 
-        // printf("\nM1 + M2:\n");
-        // MatrixPrint(Mout, n, p);
+        printf("\nM1 * M2:\n");
+        MatrixPrint(Mout, n, p);
     }
     else if (strcmp(hardware, "GPU") == 0) {
         printf("\nOn GPU:\n");
@@ -108,7 +109,7 @@ int main(int argc, char *argv[]) {
         cudaMemcpy(d_M2, M2, n * p * sizeof(float), cudaMemcpyHostToDevice);
 
         // Define block and grid sizes
-        dim3 blockDim(4,4);  
+        dim3 blockDim(16,16);  
         dim3 gridSize((p+blockDim.x-1)/blockDim.x, (n + blockDim.y-1)/blockDim.y);
 
         // Launch kernel
