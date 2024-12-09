@@ -9,6 +9,8 @@
 #define OUTPUT_HEIGHT 28
 #define OUTPUT_WIDTH 28
 
+
+/* V1
 void MatrixPrint(float *M, int n, int p){
     for (int i = 0; i < n; i++) {
         for (int j = 0; j < p; j++) {
@@ -17,6 +19,21 @@ void MatrixPrint(float *M, int n, int p){
         printf("\n"); 
     }
 }
+*/
+void MatrixPrint(float *M, int channels, int height, int width) {
+    for (int c = 0; c < channels; c++) {
+        printf("Canal %d :\n", c);
+        for (int h = 0; h < height; h++) {
+            for (int w = 0; w < width; w++) {
+                printf("%.2f ", M[c * height * width + h * width + w]);
+            }
+            printf("\n");
+        }
+        printf("\n");
+    }
+}
+
+
 
 void MatrixAdd(float *M1, float *M2, float *Mout, int n, int p){
     for (int i = 0; i < n; i++) {
@@ -134,7 +151,7 @@ int main(int argc, char *argv[]) {
     // init raw_data between 0 and 1
     srand((unsigned int)time(NULL));
     for (int i = 0; i < N1; i++) {
-        raw_data[i] = ((float)rand() / RAND_MAX);
+        raw_data[i] = ((float)rand() / RAND_MAX) * 20.0f - 10.0f;  // Entre -10 et 10
     }
     // Initialisation des matrices à 0
     for (int i = 0; i < N2; i++) {
@@ -144,7 +161,7 @@ int main(int argc, char *argv[]) {
         S1_data[i] = 0.0f;
     }
     for (int i = 0; i < N4; i++) {
-        C1_kernel[i] = ((float)rand() / RAND_MAX);
+        C1_kernel[i] = ((float)rand() / RAND_MAX) * 20.0f - 10.0f;  // Entre -10 et 10
     }
 
     float *d_raw_data, *d_C1_data, *d_C1_kernel, *d_S1_data;
@@ -175,6 +192,7 @@ int main(int argc, char *argv[]) {
     cudaMemcpy(C1_data, d_C1_data, N2 * sizeof(float), cudaMemcpyDeviceToHost);
     cudaMemcpy(S1_data, d_S1_data, N3 * sizeof(float), cudaMemcpyDeviceToHost);
     
+    /*
     for (int c = 0; c < 6; c++) {
         printf("Canal %d :\n", c);
         for (int h = 0; h < 14; h++) {
@@ -184,6 +202,15 @@ int main(int argc, char *argv[]) {
             printf("\n");
         }
     }
+    */
+
+    //printf("raw data. \n");
+    //MatrixPrint(raw_data, 6, 14, 14);
+    //printf("C1 data. \n");
+    //MatrixPrint(C1_data, 6, 14, 14);
+    //printf("S1 data. \n");
+    printf("Activation output. \n");
+    MatrixPrint(S1_data, 6, 14, 14);
 
     // Libération de la mémoire
     free(raw_data);
