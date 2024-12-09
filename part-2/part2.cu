@@ -161,7 +161,7 @@ int main(int argc, char *argv[]) {
         S1_data[i] = 0.0f;
     }
     for (int i = 0; i < N4; i++) {
-        C1_kernel[i] = ((float)rand() / RAND_MAX) * 20.0f - 10.0f;  // Entre -10 et 10
+        C1_kernel[i] = ((float)rand() / RAND_MAX);  // Entre -10 et 10
     }
 
     float *d_raw_data, *d_C1_data, *d_C1_kernel, *d_S1_data;
