@@ -25,6 +25,7 @@ void imgColorPrint(int height, int width, int ***img){
 int main() {
   int i, j;
   int ***img;
+  int indice_img = 0;
   int color[3]={255,0,0};
   unsigned int magic, nbImg, nbRows, nbCols;
   unsigned char val;
@@ -66,8 +67,9 @@ int main() {
   }
 
   imgColorPrint(HEIGHT, WIDTH, img);
-  fseek(fptr, 16, SEEK_SET);  // 16 bytes to skip the header data for image
+  fseek(fptr, 16 + indice_img * WIDTH * HEIGHT, SEEK_SET);  // Aller à l'image d'indice indice_img
 
+  printf("\n");
   // setup image grayscale
   for (i = 0; i < HEIGHT; i++) {
     for (j = 0; j < WIDTH; j++) {
