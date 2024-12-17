@@ -46,7 +46,7 @@ La lecture de cet article vous apportera les informations nécessaires pour comp
 
 **Layer 3 Attention**: Contraitement à ce qui est décrit dans l'article, la 3eme couche du CNN prendra en compte tous les features pour chaque sortie.
 
-## **Partie 1 -** Prise en main de CUDA: Multiplication de matrices
+## **Partie 1 : Prise en main de CUDA: Multiplication de matrices**
 
 **Multiplication de matrices**
 
@@ -234,7 +234,7 @@ sys   0m0.009s
 
 &rarr; On en conclu que pour les calculs complexes (dès qu'une a une matrice de dimension élevée), la parallélisation du GPU permet des calculs beaucoup plus rapides qu'avec le CPU.
 
-## **Partie 2.** Premières couches du réseau de neurone LeNet-5 : Convolution 2D et subsampling
+## **Partie 2 : Premières couches du réseau de neurone LeNet-5 : Convolution 2D et subsampling**
 
 Dans cette partie nous allons mettre en avant l'intéret des calculs sur GPU pour la convolution. En effet les calculs de la convolution sont paraléllisables. Nous allons donc implémenter chaque étapes en CUDA.
 
@@ -349,4 +349,86 @@ Canal 0 :
 1.00 1.00 1.00 1.00 -1.00 -0.99 -1.00 -1.00 -1.00 -1.00 -1.00 -1.00 -1.00 -1.00 
 -1.00 1.00 -1.00 1.00 -1.00 1.00 1.00 1.00 -1.00 -1.00 -1.00 1.00 -1.00 1.00 
 1.00 1.00 -1.00 -1.00 -1.00 -1.00 -1.00 -1.00 -1.00 1.00 1.00 -1.00 1.00 1.00
+```
+
+## **Partie 3 : Un peu de Python**
+
+#### **Architecture du modèle LeNet-5**
+Summary : 
+
+| **Couche**                   | **Forme de sortie**      | **Paramètres**   |
+|-----------------------------|-------------------------|-----------------|
+| `Conv2D`                    | (None, 28, 28, 6)       | 156             |
+| `AveragePooling2D`          | (None, 14, 14, 6)       | 0               |
+| `Conv2D`                    | (None, 10, 10, 16)      | 2,416           |
+| `AveragePooling2D`          | (None, 5, 5, 16)        | 0               |
+| `Flatten`                   | (None, 400)             | 0               |
+| `Dense`                     | (None, 120)             | 48,120          |
+| `Dense`                     | (None, 84)              | 10,164          |
+| `Dense`                     | (None, 10)              | 850             |
+
+- **Total des paramètres** : **185,120**.
+
+---
+
+#### **Résultats de l'entraînement**
+On entraîne le modèle sur 5 époques et on obtient alors :
+
+| **Époque** | **Loss (train)** | **Accuracy (train)** | **Loss (val)** | **Accuracy (val)** |
+|------------|------------------|----------------------|---------------|--------------------|
+| 1          | 0.3999           | 88.35%               | 0.0820        | 97.52%             |
+| 2          | 0.0922           | 97.12%               | 0.0524        | 98.52%             |
+| 3          | 0.0599           | 98.06%               | 0.0374        | 98.98%             |
+| 4          | 0.0441           | 98.66%               | 0.0358        | 98.92%             |
+| 5          | 0.0344           | 98.88%               | 0.0220        | 99.30%             |
+
+- **Performances finales** :
+   - Train Accuracy : 98.88%
+   - Validation Accuracy : 99.30%
+
+
+Le modèle **LeNet-5** a atteint des performances élevées sur les données MNIST avec une accuracy de 99.30% sur les données de validation et 98.32% sur les données de test.
+
+## **Partie 4 : Pour aller plus loin**
+Dans cette partie nous cherchons à réécrire ce qui a été fait précédemment en python mais cette fois ci en CUDA. 
+
+**Réalisation des fonctions :**
+
+- Flatten output:
+```
+__global__ void dense(float *input, float *weights, float *biases, float *output, int inputSize, int outputSize) {
+    int o = blockIdx.x * blockDim.x + threadIdx.x;  // index de sortie
+
+    if (o < outputSize) {
+        float sum = biases[o];  // Initialise avec le biais
+        for (int i = 0; i < inputSize; i++) {
+            int weight_index = o * inputSize + i;  // Accès aux poids
+            sum += input[i] * weights[weight_index];
+        }
+        output[o] = sum;  // Résultat final
+    }
+}
+
+0.077454 0.802524 0.000051 0.000147 0.002082 0.117742 -9.333830 -0.956840 -13.483091 -8.735582 -13.040709 -0.064433 3.159611 10.462633 
+9.018375 2.382145 -26.627108 -24.274765 -18.120186 -7.247811 -5.084383 -1.039638 -1.946880 10.069160 6.047656 10.778794 3.472198 -16.195780 
+2.608064 -0.796158 -20.287775 -14.527450 -6.549793 -2.499450 -4.403770 -4.591553 -4.911975 4.612906 12.033442 8.439759 1.954841 -10.608830 
+2.475895 -7.996739 -12.481097 -3.519950 4.861276 0.651339 -0.518407 -5.478805 -19.427748 -9.087626 -0.085803 0.937232 19.485609 3.662286 
+-13.373838 0.392017 10.742243 4.990727 13.062563 15.828794 11.923781 -8.384872 -16.831284 -12.951433 -6.650513 4.517340 15.606033 14.159834
+```
+
+- Dense layer output:
+```
+__global__ void flatten(float *input, float *output, int width, int height, int channels) {
+    int c = blockIdx.z;  
+    int h = blockIdx.y * blockDim.y + threadIdx.y;
+    int w = blockIdx.x * blockDim.x + threadIdx.x;
+
+    if (c < channels && h < height && w < width) {
+        int input_idx = c * width * height + h * width + w;
+        int output_idx = c * width * height + h * width + w;
+        output[output_idx] = input[input_idx];
+    }
+}
+
+154.618729 -474.889465 280.665833 -287.891846 3.782578 -141.121597 -71.124809 56.034840 -154.868713 147.574188 257.743988 -120.494926 399.301758 -131.270584 66.266685 -6.478206 -188.519272 -225.982376 99.752197 5.993782 -509.000092 -117.273857 -7.376636 261.661224 -95.987907 -44.576271 -351.823730 375.547119 333.832428 -39.807873 201.307419 -109.667503 67.716751 40.761856 -33.530724 -442.167358 159.558548 -52.746864 176.823318 195.487839 -14.958838 -231.826706 -92.011192 151.586899 -374.555298 563.383301 91.032272 -73.716438 189.684586 -199.543579 20.589413 -209.407166 -87.178383 266.815979 -456.790558 381.005188 222.281357 -482.727509 266.709442 -137.532700 237.589462 373.344421 630.760559 -19.437088 -535.067993 -620.710571 -225.723221 275.912262 168.731705 -230.038406 -82.355492 198.288910 -384.856171 -182.140213 120.043930 411.068573 -24.760420 248.275879 55.705803 29.359665 -193.129471 239.115341 43.500626 141.410004 -97.736031 604.338684 -239.947189 -10.887711 79.376732 99.437897 -67.556541 311.853485 214.157379 -335.437347 43.036919 363.870026 52.217258 -450.807281 -175.296738 -44.155437 -157.436676 -35.090309 410.430450 67.445892 -206.934189 -108.098167 -313.289642 537.363953 -88.418320 97.877953 -51.995796 -17.600351 50.212112 -21.864929 -192.470734 -506.381958 15.324105 219.031540 455.173431 80.140450
 ```
