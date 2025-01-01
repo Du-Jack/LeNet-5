@@ -115,6 +115,69 @@ __global__ void subsample2D(float *input, float *output, int inputWidth, int inp
     }
 }
 
+__global__ void convolve_multichannel(float *input, float *kernels, float *output,
+                                      int input_height, int input_width,
+                                      int kernel_size, int input_channels,
+                                      int output_channels, int output_height,
+                                      int output_width) {
+    int o_c = blockIdx.z;  // Output channel index
+    int h = blockIdx.y * blockDim.y + threadIdx.y; 
+    int w = blockIdx.x * blockDim.x + threadIdx.x;  
+
+    if (o_c < output_channels && h < output_height && w < output_width) {
+        float sum = 0.0f;
+        for (int i_c = 0; i_c < input_channels; i_c++) {
+            for (int kh = 0; kh < kernel_size; kh++) {
+                for (int kw = 0; kw < kernel_size; kw++) {
+                    int y = h + kh;  
+                    int x = w + kw;
+                    int input_idx = i_c * input_height * input_width + y * input_width + x;
+                    int kernel_idx = o_c * input_channels * kernel_size * kernel_size +
+                                     i_c * kernel_size * kernel_size + kh * kernel_size + kw;
+                    sum += input[input_idx] * kernels[kernel_idx];
+                }
+            }
+        }
+        int output_idx = o_c * output_height * output_width + h * output_width + w;
+        output[output_idx] = sum;
+    }
+}
+
+__global__ void flatten(float *input, float *output, int width, int height, int channels) {
+    int c = blockIdx.z;  
+    int h = blockIdx.y * blockDim.y + threadIdx.y;
+    int w = blockIdx.x * blockDim.x + threadIdx.x;
+
+    if (c < channels && h < height && w < width) {
+        int input_idx = c * width * height + h * width + w;
+        int output_idx = c * width * height + h * width + w;
+        output[output_idx] = input[input_idx];
+    }
+}
+
+void PrintFlattenedOutput(float *data, int size) {
+    for (int i = 0; i < size; i++) {
+        printf("%f ", data[i]);
+        if ((i + 1) % 14 == 0) {  // Exemple : saut de ligne après 14 éléments
+            printf("\n");
+        }
+    }
+    printf("\n");
+}
+
+__global__ void dense(float *input, float *weights, float *biases, float *output, int inputSize, int outputSize) {
+    int o = blockIdx.x * blockDim.x + threadIdx.x;  // index de sortie
+
+    if (o < outputSize) {
+        float sum = biases[o];  // Initialise avec le biais
+        for (int i = 0; i < inputSize; i++) {
+            int weight_index = o * inputSize + i;  // Accès aux poids
+            sum += input[i] * weights[weight_index];
+        }
+        output[o] = sum;  // Résultat final
+    }
+}
+
 __device__ float activation_tanh(float M) {
     return tanh(M);
 }
@@ -151,41 +214,6 @@ __global__ void apply_activation_softmax(float *data, int size, int length) {
     }
 }
 
-__global__ void flatten(float *input, float *output, int width, int height, int channels) {
-    int c = blockIdx.z;  
-    int h = blockIdx.y * blockDim.y + threadIdx.y;
-    int w = blockIdx.x * blockDim.x + threadIdx.x;
-
-    if (c < channels && h < height && w < width) {
-        int input_idx = c * width * height + h * width + w;
-        int output_idx = c * width * height + h * width + w;
-        output[output_idx] = input[input_idx];
-    }
-}
-
-
-__global__ void dense(float *input, float *weights, float *biases, float *output, int inputSize, int outputSize) {
-    int o = blockIdx.x * blockDim.x + threadIdx.x;  // index de sortie
-
-    if (o < outputSize) {
-        float sum = biases[o];  // Initialise avec le biais
-        for (int i = 0; i < inputSize; i++) {
-            int weight_index = o * inputSize + i;  // Accès aux poids
-            sum += input[i] * weights[weight_index];
-        }
-        output[o] = sum;  // Résultat final
-    }
-}
-
-void PrintFlattenedOutput(float *data, int size) {
-    for (int i = 0; i < size; i++) {
-        printf("%f ", data[i]);
-        if ((i + 1) % 14 == 0) {  // Exemple : saut de ligne après 14 éléments
-            printf("\n");
-        }
-    }
-    printf("\n");
-}
 
 
 
