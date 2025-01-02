@@ -1,6 +1,6 @@
-# LeNet-5
+# LeNet-5 model
 
-*Last update: 2024.12.09*
+*Last update: 2025.01.01*
 
 ## Get started
 
