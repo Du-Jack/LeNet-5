@@ -2,6 +2,7 @@
 
 *Last update: 2025.01.03*
 
+*Contributors:* **DU Jack, LAROYE Ambroise**
 ## Get started
 
 ### Install prerequesities
