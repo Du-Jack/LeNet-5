@@ -1,6 +1,6 @@
 # LeNet-5 model
 
-*Last update: 2025.01.01*
+*Last update: 2025.01.03*
 
 ## Get started
 
@@ -171,7 +171,7 @@ user  0m0.024s
 sys   0m0.132s
 ```
 
-**Addition de deux matrices:**
+**Conclusion sur l'addition de deux matrices:**
 | **Device**     | **n=10, p=10**      | **n=1000, p=1000**      |
 |----------------|----------------|----------------|
 | CPU | 2 ms  | 9.085s |
@@ -232,7 +232,8 @@ sys   0m0.009s
 | CPU | 0.005s  | 9.083s |
 | GPU| 0.185s | 0.297s |
 
-&rarr; On en conclu que pour les calculs complexes (dès qu'une a une matrice de dimension élevée), la parallélisation du GPU permet des calculs beaucoup plus rapides qu'avec le CPU.
+&rarr; On en conclu que pour les calculs complexes (dès qu'une a une matrice de dimension élevée > 100), la parallélisation du GPU permet des calculs beaucoup plus rapides qu'avec le CPU.
+
 
 ## **Partie 2 : Premières couches du réseau de neurone LeNet-5 : Convolution 2D et subsampling**
 
@@ -251,45 +252,50 @@ On génère tout d'abord les matrices dont nous avonss besoin :
 - Une matrice float **S1_data** de taille 6x14x14 intialisé à 0 qui prendra les valeurs de sortie du souséchantillonnage. S1 correspond aux données après le premier Sous-échantillonnage.
 - Une matrice float **C1_kernel** de taille 6x5x5 initialisé à des valeurs comprises entre 0 et 1 correspondant à nos premiers noyaux de convolution.
 
-On crée des tableaux à 1 dimension N=32x32, 6x28x28, 6x14x14 et 6x5x5 respectivement pour ces vecteurs.
+On crée des tableaux à 1 dimension N=*32x32*, *6x28x28*, *6x14x14* et *6x5x5* respectivement pour ces vecteurs.
 
-Nous initialisation le Kernel avec des valeurs aléatoire entre 0 et 1. Et les valeurs de la matrice initiale est initialisé avec des valeur aléatoire entre -10 et 10. (Nous avons pris l'initative de modifier cette valeur d'initialisation pour mettre en lumière la fonction d'activation. De ce fait nous obtiendrons après activation des valeurs positive ou négative entre -1 et 1)
+Nous initialisons le kernel avec des valeurs aléatoire **entre 0 et 1**. Et les valeurs de la matrice initiale est initialisé avec des valeur aléatoire entre -10 et 10. (Nous avons pris l'initative de modifier cette valeur d'initialisation pour mettre en lumière la fonction d'activation. De ce fait nous obtiendrons après activation des valeurs positive ou négative entre -1 et 1)
 
+***
 ### **Layer 2 - Convolution 2D** <br> 
 Convolution avec 6 noyaux de convolution de taille 5x5. La taille résultantes est donc de 6x28x28.
 
+***
 ### **Layer 3- Sous-échantillonnage** <br> 
 Sous-échantillonnage d'un facteur 2. La taille résultantes des données
 est donc de 6x14x14.
 
+***
 ### **Tests**
+
 Affichage du premier terme de la convolution : 
 
-Execute `./convolve `
+Execute 
 ```
-# Convolution 
-
+cd part-2/
+./convolve 
+```
+Results:
+```
 C1_data[0][0][0] = 7.014266
 ```
+
 Initialisation de la matrice Raw data puis la convolution C1 data puis le sous échantiollonnage S1 data :
 
-Execute `./part2-init`
+Execute:
+``` 
+cd part-2/
+`./part2-init`
+```
+
+Results:
 ```
 Canal 0 :
 -5.81 3.11 2.78 7.31 -5.42 3.19 -8.04 -3.40 7.03 7.85 0.91 -7.98 7.62 9.00 
 -9.43 8.68 -7.89 6.90 2.14 7.05 5.71 6.62 -4.92 8.60 5.71 7.74 -7.45 -4.78 
 -8.82 -3.40 -2.45 -4.63 9.71 -9.68 -7.32 -5.71 3.51 -5.36 0.89 0.54 -7.51 -8.20 
 2.56 -9.89 -9.20 3.13 8.79 -7.09 0.03 0.93 9.95 -4.26 -2.45 -4.97 -5.66 -6.74 
--7.23 -3.12 -1.52 -6.05 3.49 6.03 -0.68 3.20 6.36 2.00 7.49 -0.13 6.64 -1.62 
--9.59 9.14 0.19 2.97 9.25 0.99 -3.91 8.04 3.89 6.12 -1.03 3.85 -8.14 6.52 
-8.88 -3.81 9.78 -8.35 3.08 -1.74 -4.40 -3.44 -5.70 4.91 9.76 -9.35 -3.09 7.25 
-0.52 -6.45 -4.37 0.93 -7.31 5.82 -6.10 -8.07 -3.19 -0.01 9.97 -9.30 -3.89 -1.06 
-4.55 -2.03 -4.55 3.42 4.16 -4.77 5.07 -2.76 3.49 -9.33 3.80 7.79 5.58 3.57 
-8.44 -7.51 0.82 -1.03 -3.96 6.45 9.90 -1.27 2.27 -6.20 0.66 9.07 3.79 0.63 
-9.77 9.90 9.57 4.32 -2.13 -4.98 -2.26 -7.96 0.25 -7.18 -0.72 -6.26 -6.51 -6.92 
--8.47 9.07 6.64 9.97 -8.44 -2.54 -1.06 -2.40 -6.09 -1.16 6.33 6.18 2.64 -3.01 
-5.25 -3.57 7.62 5.03 -3.66 7.19 -0.65 4.21 -7.79 7.09 6.25 2.46 9.91 -4.48 
-6.20 -6.60 -1.40 7.73 -7.53 -4.75 7.70 -5.97 2.71 -3.36 1.63 6.62 5.48 -2.04
+...
 
 # And 4 other canal 
 ________________________________________________________________
@@ -300,16 +306,8 @@ Canal 0 :
 -94.31 67.66 -10.24 -181.22 205.11 -106.69 -233.56 27.18 -216.66 155.64 -83.44 0.78 53.67 154.40 
 347.05 -96.68 -22.20 70.32 191.76 104.49 -27.53 70.42 275.64 101.25 253.89 305.36 -3.36 251.13 
 213.72 24.62 -145.44 -174.17 142.62 -133.44 87.90 -89.70 -83.29 -205.41 -59.62 44.23 33.11 17.30 
--39.48 -38.33 215.18 -54.41 -97.53 277.11 -338.76 113.40 295.90 -43.64 136.35 32.66 -45.85 -17.32 
--39.20 -53.76 -3.48 149.42 -53.92 94.97 220.95 -225.00 69.92 -150.06 281.59 -32.44 -95.79 219.67 
--58.95 194.97 286.86 -24.49 173.13 195.04 -90.94 167.74 33.74 40.18 -113.75 -179.93 308.80 188.28 
-181.92 -216.98 142.99 -78.18 -48.59 -151.43 -53.19 -121.80 -9.98 20.97 171.19 -87.75 -4.09 197.72 
--112.20 204.83 93.08 -121.62 15.61 -114.79 -73.73 -206.87 -221.16 -204.24 -31.58 187.63 153.64 236.96 
--170.15 103.88 118.77 6.19 289.93 -252.10 181.78 8.80 18.51 56.46 -253.99 -176.89 -128.08 -217.96 
-37.23 153.20 90.20 -132.27 156.07 -26.60 12.72 -131.70 179.44 126.34 110.23 92.84 19.47 -125.39 
--249.28 52.36 -317.13 -209.43 22.81 -141.30 347.44 -167.14 190.26 68.17 -88.96 46.83 29.66 -62.32 
--92.90 8.30 -91.49 -78.13 -125.09 -231.20 -154.34 -8.57 23.46 -167.49 -169.18 -153.04 -74.87 -93.18 
-106.90 30.71 -39.05 282.52 278.11 -70.62 189.00 -131.91 35.50 -224.19 -161.44 37.39 -125.61 -180.99
+
+...
 ________________________________________________________________
 S1 data. 
 
@@ -317,44 +315,37 @@ Canal 0 :
 62.45 -37.99 12.79 -39.02 33.39 109.75 63.31 52.92 -127.77 26.90 -52.04 -87.43 -24.51 64.62 
 14.55 105.78 136.94 -37.14 81.55 -31.17 108.48 -32.00 52.69 -39.74 -44.76 -17.29 83.15 79.37 
 70.77 -17.65 7.57 -99.89 -29.90 89.78 71.17 -65.80 -100.40 -20.17 92.72 83.35 -118.25 -94.67 
--126.49 26.54 -157.40 6.01 -120.81 -75.53 -38.72 -21.59 4.26 -39.31 77.06 7.13 -75.33 -73.43 
--198.76 82.91 -49.13 -28.27 -30.20 57.02 -50.35 -73.94 -126.75 9.17 94.68 -83.94 -19.81 -29.57 
-121.30 -136.98 45.25 -114.56 14.67 77.73 -41.37 21.49 48.87 -41.31 -33.09 -135.58 -39.65 155.67 
-86.30 15.14 55.47 -1.06 -49.33 -161.51 22.80 7.99 76.27 84.20 -75.07 132.17 161.07 -128.78 
--51.81 27.04 -37.60 66.29 5.35 54.13 -98.67 -66.34 -100.27 40.72 83.60 -55.07 42.22 75.83 
--12.08 20.20 0.05 40.16 28.57 -45.95 49.56 83.37 46.43 -95.69 -55.77 -204.65 38.43 32.60 
--33.93 -63.34 143.68 55.96 -24.42 81.59 143.70 73.78 -7.33 -1.91 -39.58 -167.31 -206.52 -43.29 
--47.46 158.17 64.49 -41.40 116.79 -98.45 1.02 -49.48 -37.30 -161.07 -120.00 -0.20 37.57 -105.40 
-86.68 138.36 112.61 144.31 -26.65 -78.15 -66.08 -108.79 -221.48 -72.94 64.95 -109.60 -10.29 40.42 
--47.04 76.33 -66.96 -36.21 -116.65 48.66 -104.29 -52.52 28.31 -43.14 -79.00 -62.76 -72.27 -116.42 
-52.52 -8.74 35.00 10.88 143.13 1.72 30.16 17.68 -97.64 31.94 -71.15 -12.39 47.45 23.30
+...
 ```
+
 Affichage de la matrice après activation :
 
-Execute `./part2-activation`
+``` Execute
+cd part-2/
+./part2-activation
 ```
-S1 data. 
+
+Activation output.
+```
 Canal 0 :
--1.00 1.00 1.00 -1.00 -1.00 -1.00 -1.00 -1.00 -1.00 1.00 1.00 -1.00 1.00 1.00 
--1.00 1.00 -1.00 -1.00 1.00 -1.00 1.00 -1.00 -1.00 1.00 1.00 -0.86 0.99 -1.00 
-1.00 1.00 1.00 1.00 -1.00 -1.00 -1.00 1.00 -1.00 1.00 1.00 1.00 -0.90 1.00 
--1.00 -1.00 -1.00 -1.00 -1.00 -1.00 1.00 -1.00 -1.00 -1.00 1.00 -1.00 -1.00 -1.00 
-1.00 -1.00 1.00 1.00 1.00 -1.00 1.00 -1.00 1.00 1.00 -1.00 -1.00 1.00 -1.00 
-1.00 1.00 -1.00 -1.00 -1.00 -1.00 1.00 -1.00 -1.00 -1.00 1.00 1.00 -1.00 1.00 
--1.00 1.00 1.00 0.94 1.00 -1.00 -1.00 1.00 1.00 -1.00 -1.00 -1.00 1.00 1.00 
-1.00 -1.00 -1.00 -1.00 -1.00 1.00 -0.23 -1.00 1.00 1.00 1.00 1.00 1.00 -1.00 
-1.00 1.00 1.00 1.00 -1.00 -1.00 -1.00 0.22 1.00 -1.00 -1.00 1.00 -1.00 1.00 
-1.00 1.00 -1.00 -1.00 1.00 1.00 1.00 1.00 -1.00 1.00 -1.00 -1.00 -1.00 -1.00 
--1.00 1.00 -1.00 1.00 1.00 -1.00 1.00 -1.00 1.00 -1.00 -1.00 1.00 -1.00 1.00 
-1.00 1.00 1.00 1.00 -1.00 -0.99 -1.00 -1.00 -1.00 -1.00 -1.00 -1.00 -1.00 -1.00 
--1.00 1.00 -1.00 1.00 -1.00 1.00 1.00 1.00 -1.00 -1.00 -1.00 1.00 -1.00 1.00 
-1.00 1.00 -1.00 -1.00 -1.00 -1.00 -1.00 -1.00 -1.00 1.00 1.00 -1.00 1.00 1.00
+-1.00 0.82 -1.00 -1.00 -0.93 -1.00 0.94 1.00 1.00 -1.00 -1.00 1.00 1.00 1.00
+-1.00 -1.00 -0.87 1.00 1.00 1.00 -1.00 0.94 1.00 0.93 -1.00 0.98 0.98 -0.99
+-1.00 -1.00 -1.00 0.95 1.00 1.00 -1.00 -1.00 -1.00 1.00 1.00 0.66 -1.00 -1.00
+-1.00 -1.00 -1.00 -1.00 1.00 1.00 -1.00 -1.00 1.00 1.00 -1.00 -1.00 -1.00 -1.00
+...
 ```
 
 ## **Partie 3 : Un peu de Python**
 
-#### **Architecture du modèle LeNet-5**
-Summary : 
+Dans cette partie, vous allez faire l'entrainement de votre réseau de neurone et comprendre les dernières couches associés à mettre en place dans notre programme CUDA pour implémenter l'inférence du modèle LeNet-5 sur le dataset MNIST.
+
+### 3.1. EN PYTHON
+### **Notebook jupyter**: 
+Tout d'abord, nous travaillons en Python avec le framework TensorFlow pour entraîner le modèle LetNet-5 et comprendre son architecture.
+
+### **Architecture du modèle LeNet-5**
+
+**Summary:**
 
 | **Couche**                   | **Forme de sortie**      | **Paramètres**   |
 |-----------------------------|-------------------------|-----------------|
@@ -372,9 +363,9 @@ Summary :
 ---
 
 #### **Résultats de l'entraînement**
-On entraîne le modèle sur 5 époques et on obtient alors :
+On entraîne le modèle sur 5 epochs et on obtient alors :
 
-| **Époque** | **Loss (train)** | **Accuracy (train)** | **Loss (val)** | **Accuracy (val)** |
+| **Epochs** | **Loss (train)** | **Accuracy (train)** | **Loss (val)** | **Accuracy (val)** |
 |------------|------------------|----------------------|---------------|--------------------|
 | 1          | 0.3999           | 88.35%               | 0.0820        | 97.52%             |
 | 2          | 0.0922           | 97.12%               | 0.0524        | 98.52%             |
@@ -389,46 +380,170 @@ On entraîne le modèle sur 5 époques et on obtient alors :
 
 Le modèle **LeNet-5** a atteint des performances élevées sur les données MNIST avec une accuracy de 99.30% sur les données de validation et 98.32% sur les données de test.
 
-## **Partie 4 : Pour aller plus loin**
-Dans cette partie nous cherchons à réécrire ce qui a été fait précédemment en python mais cette fois ci en CUDA. 
+### Export des poids dans un fichier
 
-**Réalisation des fonctions :**
+Afin de faire fonctionner notre réseau de neurones sur des données représentant des objets réels (et non plus des valeurs aléatoires) en inférence, il est nécessaire d'importer les poids dans un programme écrit en C/CUDA.
 
-- Flatten output:
+C'est ce que nous avons fait dans le notebook. [LeNet5.ipynb](/part-3/LeNet5.ipynb)
+Nous avons enregistré les poids et les biais dans des fichiers `.dat` spécifiques pour chaque couche du modèle afin d'enregistrer en binaire et récupérer ces données binaires et les charger en C/CUDA dans la fonction main du modèle [LeNet-5-CUDA.cu](/part-3/LeNet-5-CUDA.cu).
+
+A chaque exécution du modèle, nous avons cette sortie qui valide l'import des poids et des biais et nous avons affiché la première ligne correspondant aux poids de la 1ère couche.
+
+Execute
 ```
-__global__ void dense(float *input, float *weights, float *biases, float *output, int inputSize, int outputSize) {
-    int o = blockIdx.x * blockDim.x + threadIdx.x;  // index de sortie
+cd part-3/
+./LeNet-5-CUDA 4
+```
+Results:
+```
+Successfully loaded weights from conv1_weights.dat
+Successfully loaded biases from conv1_biases.dat
+Successfully loaded weights from conv3_weights.dat
+Successfully loaded biases from conv3_biases.dat
+Successfully loaded weights from dense_c5_weights.dat
+Successfully loaded biases from dense_c5_biases.dat
+Successfully loaded weights from dense_f6_weights.dat
+Successfully loaded biases from dense_f6_biases.dat
+Successfully loaded weights from dense_output_weights.dat
+Successfully loaded biases from dense_output_biases.dat
+-0.008230 -0.193482 -0.129807 0.079189 0.205270 -0.060015 0.135708 -0.148366 0.101399 -0.128285
+```
 
-    if (o < outputSize) {
-        float sum = biases[o];  // Initialise avec le biais
-        for (int i = 0; i < inputSize; i++) {
-            int weight_index = o * inputSize + i;  // Accès aux poids
-            sum += input[i] * weights[weight_index];
-        }
-        output[o] = sum;  // Résultat final
-    }
-}
+***
 
+### 3.2. EN CUDA ([LeNET-5-CUDA.cu](/part-3/LeNet-5-CUDA.cu))
+Dans cette deuxième sous-partie, nous cherchons à réécrire ce qui a été fait précédemment en python mais cette fois ci en CUDA afin de permettre l'inférence du modèle LeNet-5 en CUDA.
+
+### Faites une synthèse des différents layers et listez ce qu'il vous manque.
+Au vu de l'architecture du modèle, il nous manque comme couches : 
+- La couche `Flatten` pour permettre d'avoir un Fully Connected Layer et établir une connexion entre les couches de convolution
+- La couche `Dense`, étant une couche de prédiction et qui permet d'obtenir le label détecté par le modèle
+- Fonction d'activation `softmax` au niveau de la couche de sortie afin d'obtenir une probabilité partagée entre les 10 possibilités de sortie.
+
+### Création des fonctions manquantes:
+
+- Flatten layer `__global__ void dense`:<br>
+
+``` Execute
+cd part-3/
+./flatten
+```
+
+Results:
+```
 0.077454 0.802524 0.000051 0.000147 0.002082 0.117742 -9.333830 -0.956840 -13.483091 -8.735582 -13.040709 -0.064433 3.159611 10.462633 
 9.018375 2.382145 -26.627108 -24.274765 -18.120186 -7.247811 -5.084383 -1.039638 -1.946880 10.069160 6.047656 10.778794 3.472198 -16.195780 
-2.608064 -0.796158 -20.287775 -14.527450 -6.549793 -2.499450 -4.403770 -4.591553 -4.911975 4.612906 12.033442 8.439759 1.954841 -10.608830 
-2.475895 -7.996739 -12.481097 -3.519950 4.861276 0.651339 -0.518407 -5.478805 -19.427748 -9.087626 -0.085803 0.937232 19.485609 3.662286 
--13.373838 0.392017 10.742243 4.990727 13.062563 15.828794 11.923781 -8.384872 -16.831284 -12.951433 -6.650513 4.517340 15.606033 14.159834
+...
 ```
 
-- Dense layer output:
-```
-__global__ void flatten(float *input, float *output, int width, int height, int channels) {
-    int c = blockIdx.z;  
-    int h = blockIdx.y * blockDim.y + threadIdx.y;
-    int w = blockIdx.x * blockDim.x + threadIdx.x;
 
-    if (c < channels && h < height && w < width) {
-        int input_idx = c * width * height + h * width + w;
-        int output_idx = c * width * height + h * width + w;
-        output[output_idx] = input[input_idx];
-    }
-}
+- Dense layer `__global__ void flatten`:
 
-154.618729 -474.889465 280.665833 -287.891846 3.782578 -141.121597 -71.124809 56.034840 -154.868713 147.574188 257.743988 -120.494926 399.301758 -131.270584 66.266685 -6.478206 -188.519272 -225.982376 99.752197 5.993782 -509.000092 -117.273857 -7.376636 261.661224 -95.987907 -44.576271 -351.823730 375.547119 333.832428 -39.807873 201.307419 -109.667503 67.716751 40.761856 -33.530724 -442.167358 159.558548 -52.746864 176.823318 195.487839 -14.958838 -231.826706 -92.011192 151.586899 -374.555298 563.383301 91.032272 -73.716438 189.684586 -199.543579 20.589413 -209.407166 -87.178383 266.815979 -456.790558 381.005188 222.281357 -482.727509 266.709442 -137.532700 237.589462 373.344421 630.760559 -19.437088 -535.067993 -620.710571 -225.723221 275.912262 168.731705 -230.038406 -82.355492 198.288910 -384.856171 -182.140213 120.043930 411.068573 -24.760420 248.275879 55.705803 29.359665 -193.129471 239.115341 43.500626 141.410004 -97.736031 604.338684 -239.947189 -10.887711 79.376732 99.437897 -67.556541 311.853485 214.157379 -335.437347 43.036919 363.870026 52.217258 -450.807281 -175.296738 -44.155437 -157.436676 -35.090309 410.430450 67.445892 -206.934189 -108.098167 -313.289642 537.363953 -88.418320 97.877953 -51.995796 -17.600351 50.212112 -21.864929 -192.470734 -506.381958 15.324105 219.031540 455.173431 80.140450
+``` Execute
+cd part-3/
+./dense
 ```
+
+Results:
+```
+154.618729 -474.889465 280.665833 -287.891846 3.782578 -141.121597 -71.124809 56.034840 -154.868713 147.574188 257.743988 -120.494926 399.301758 -131.270584 66.266685 -6.478206 -188.519272 -225.982376 99.752197 5.993782 -509.000092 -117.273857 -7.376636 261.661224 -95.987907 -44.576271 -351.823730 375.547119 
+...
+```
+
+- Activation softmax layer `__global__ void apply_activation_softmax`:
+``` Execute
+cd part-3/
+./softmax
+```
+
+Results:
+```
+Softmax output.
+Canal 0 :
+0.00 0.00 0.00 0.00 0.00 1.00 9.72 -0.63 -7.81 -20.72 -5.36 -7.35 -6.56 -12.52
+5.64 7.55 6.14 3.04 2.38 7.72 -2.97 1.80 -9.31 -4.33 0.46 3.51 -6.50 0.36
+32.51 27.21 1.94 5.24 11.17 -4.54 0.41 5.24 -6.07 -13.43 -6.67 12.25 5.87 10.30
+32.88 18.66 5.46 18.72 16.63 23.08 3.02 16.61 -0.63 -8.47 -9.08 -7.16 -2.75 0.47
+...
+Canal 2:
+...
+Canal 5 :
+-27.54 -20.18 -16.67 -22.27 -14.04 -2.66 18.47 3.74 -10.23 -3.07 -17.75 -9.30 -10.55 -6.94
+...
+```
+
+***
+### Parallélisation:
+Nous avons dans ce modèle des couches plus ou moins facilement parallélisables.
+
+1. Facilement parallélisable: 
+    - **Convolutions (C1, C3):**<br> 
+    Les calculs de convolution sur chaque pixel et filtre peuvent être parallélisés indépendamment.
+    - **Pooling (S2, S4)**:<br>
+    Les opérations de subsampling pour chaque fenêtre peuvent être parallélisées indépendamment.
+    - **Flatten:**<br> 
+    La transformation de la forme d’un tableau 3D en un vecteur 1D est triviale à paralléliser.
+2. Modérément parallélisable:
+    - Softmax (activation function): L'exponentielle dans le calcul du softmax est facilement parallélisée mais la normalisation nécessite une étape de réduction (somme des exponentielles), qui peut être plus complexe à paralléliser efficacement.
+
+3. Difficilement parallélisable:
+    - **Dense:**<br>
+    Bien qu'il soit possible de paralléliser la multiplication matricielle, les dépendances entre les neurones rendent cette opération plus complexe à paralléliser.
+
+***
+
+### Importation du dataset MNIST et affichage des données en console:
+Le dataset MNIST est disponible sous la forme d'un fichier `train-images.zip`.
+Les images sont sauvegardées dans un fichier binaire à l'intérieur de ce fichier zip qui se nomme `train-images.idx3-ubyte`.<br>
+
+### Script printMNIST
+Un script en C/CUDA, nommé `printMNIST.cu`, est disponible pour l'ouverture de ce fichier et l'affichage d'une image. <br>
+Elle affiche en RGB la **première image** du dataset.
+Nous l'avons alors modifié afin de pouvoir afficher cette image en N/B puisque le dataset MNIST travaille sur des images en N/B.
+
+``` Execute
+cd part-3/
+./printMNIST
+```
+
+Results:
+![N/B MNIST First image](image-1.png)
+
+Nous nous sommes donc inspiré de ce script et l'implémenter à notre programme [LeNet-5.cu](/part-3/LeNet-5-CUDA.cu).
+
+Avec la fonction `fseek`, nous pouvons modifier la position du curseur afin qu'elle puisse chercher à partir d'une nouvelle position la prochaine image.
+Actuellement, pour choisir spécifiquement une image dans le dataset, il suffit d'exécuter le modèle avec la position de l'image souhaitée en argument :
+```
+cd part-3/
+./LeNet-5-CUDA numero_souhaite
+```
+
+### 3.3. Tests de l'inférence en C/CUDA du modèle LeNet-5
+
+Testez votre programme avec les données MNIST.<br>
+Pour tester l'inférence en C/CUDA du modèle LeNet-5 que nous avons implémenté, il suffit d'exécuter :
+Execute:
+```
+cd part-3/
+./LeNet-5-CUDA 4
+```
+Results:
+![results-LeNet-5-inference](image-2.png)
+
+En sortie, après debug et vérification de chaque couche du modèle, nous n'avons malheureusement pas obtenu de résultat satisfaisant du modèle. 
+En effet, la dernière couche de sortie, après application d'une fonction d'activation softmax, nous avons un problème de calcul des probabilités dont la sommes n'est pas égale à 1. Cette erreur est liée à une erreur de calcul dans la **couche de convolution multicanal (C3)** ou bien l'**application de la fonction softmax** à la sortie.
+
+## Conclusion:
+
+Nous avons à partir de ce TP pu :
+- Apprendre à utiliser CUDA,
+- Etudier la complexité de vos algorithmes et l'accélération obtenue sur GPU par rapport à une éxécution sur CPU,
+- Observer les limites de l'utilisation d'un GPU,
+- Implémenter "from scratch" un CNN : juste la partie inférence et non l'entrainement du modèle LeNet-5 ci-dessous,
+![LeNet-5 model](image.png)
+- Exporter des données depuis un notebook python et les réimporter dans un projet cuda,
+- Faire un suivi de votre projet et du versionning à l'outil git
+
+Malhreusement, par manque de temps, nous n'avons pas réussi à débloquer notre problème de mémoire et obtenir des résultats convaincants du modèle et préduire de manière correcte l'index de chaque image du dataset MNIST.
+
+***To Be Continued...***
