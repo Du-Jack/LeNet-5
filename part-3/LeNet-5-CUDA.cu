@@ -12,7 +12,7 @@
 #define CHANNELS 6
 
 
-// Structure pour stocker les dimensions de chaque couche
+// Structure to store the dimensions of each layer
 typedef struct {
     int input_height;
     int input_width;
@@ -20,12 +20,13 @@ typedef struct {
     int num_channels;
     int output_height;
     int output_width;
+    int num_neurons;
 } LayerDims;
 
-LayerDims layers[4]; // Un tableau de structures pour stocker les dimensions de chaque couche
+LayerDims layers[4]; // Array of structures to store the dimensions of each layer
 
 void init_layers() {
-    // Initialisation de la couche C1 (Convolution 1)
+    // Initialize layer C1 (Convolution 1)
     layers[0].input_height = 28;
     layers[0].input_width = 28;
     layers[0].kernel_size = 5;
@@ -33,34 +34,39 @@ void init_layers() {
     layers[0].output_height = layers[0].input_height - layers[0].kernel_size + 1;
     layers[0].output_width = layers[0].input_width - layers[0].kernel_size + 1;
 
-    // Initialisation de la couche S2 (Pooling 1)
+    // Initialize layer S2 (Pooling 1)
     layers[1].input_height = layers[0].output_height;
     layers[1].input_width = layers[0].output_width;
-    layers[1].kernel_size = 2;  // Supposons que le pooling utilise une fenêtre 2x2
+    layers[1].kernel_size = 2;  // Assume pooling uses a 2x2 window
     layers[1].num_channels = layers[0].num_channels;
     layers[1].output_height = layers[1].input_height / 2;
     layers[1].output_width = layers[1].input_width / 2;
 
-    // Initialisation de la couche C3 (Convolution 2)
+    // Initialize layer C3 (Convolution 2)
     layers[2].input_height = layers[1].output_height;
     layers[2].input_width = layers[1].output_width;
     layers[2].kernel_size = 5;
-    layers[2].num_channels = 16; // Changement du nombre de canaux
+    layers[2].num_channels = 16; // Change number of channels
     layers[2].output_height = layers[2].input_height - layers[2].kernel_size + 1;
     layers[2].output_width = layers[2].input_width - layers[2].kernel_size + 1;
 
-    // Initialisation de la couche S4 (Pooling 2)
+    // Initialize layer S4 (Pooling 2)
     layers[3].input_height = layers[2].output_height;
     layers[3].input_width = layers[2].output_width;
-    layers[3].kernel_size = 2;  // Supposons que le pooling utilise une fenêtre 2x2
+    layers[3].kernel_size = 2;  // Assume pooling uses a 2x2 window
     layers[3].num_channels = layers[2].num_channels;
     layers[3].output_height = layers[3].input_height / 2;
     layers[3].output_width = layers[3].input_width / 2;
+
+    layers[4].num_neurons = 120; // C5
+    layers[5].num_neurons = 84;  // F6
+    layers[6].num_neurons = 10;  // Final layer
+
 }
 
 void MatrixPrint(float *M, int channels, int height, int width) {
     for (int c = 0; c < channels; c++) {
-        printf("Canal %d :\n", c);
+        printf("Channel %d :\n", c);
         for (int h = 0; h < height; h++) {
             for (int w = 0; w < width; w++) {
                 printf("%.2f ", M[c * height * width + h * width + w]);
@@ -82,9 +88,9 @@ void MatrixAdd(float *M1, float *M2, float *Mout, int n, int p){
 void MatrixMult(float *M1, float *M2, float *Mout, int n, int p){
    // M1 rows
    for (int i = 0; i < n; i++) {
-       // M2 col
+       // M2 columns
        for (int j = 0; j < p; j++) {
-           // Initialiser Mout[i * p + j] à zéro avant l'addition
+           // Initialize Mout[i * p + j] to zero before addition
            Mout[i * p + j] = 0;
            for (int k = 0; k < p; k++) {
                Mout[i * p + j] += M1[i * p + k] * M2[k * p + j];
@@ -142,28 +148,30 @@ __global__ void convolve_2D(float *raw_data, float *C1_kernel, float *C1_data,
     }
 }
 
+__global__ void subsample2D(float *input, float *output,
+                            int input_height, int input_width,
+                            int output_height, int output_width,
+                            int kernel_size) {
+    int x = threadIdx.x + blockIdx.x * blockDim.x;
+    int y = threadIdx.y + blockIdx.y * blockDim.y;
+    int c = blockIdx.z;
 
-__global__ void subsample2D(float *input, float *output, int inputWidth, int inputHeight, int outputWidth, int outputHeight) {
-    int c = blockIdx.z;  
-    int h = blockIdx.y * blockDim.y + threadIdx.y; 
-    int w = blockIdx.x * blockDim.x + threadIdx.x;  
-
-    if (h < outputHeight && w < outputWidth) {
-        // Calcul de la position de la fenêtre 2x2 dans l'entrée
-        int input_y = h * 2;
-        int input_x = w * 2;
-        
-        // Moyenne des 4 pixels du bloc 2x2 dans l'entrée
+    if (x < output_width && y < output_height) {
         float sum = 0.0f;
-        for (int dy = 0; dy < 2; dy++) {
-            for (int dx = 0; dx < 2; dx++) {
-                int input_index = c * inputHeight * inputWidth + (input_y + dy) * inputWidth + (input_x + dx);
-                sum += input[input_index];
+
+        // Average pooling
+        for (int i = 0; i < kernel_size; ++i) {
+            for (int j = 0; j < kernel_size; ++j) {
+                int input_x = x * kernel_size + i;
+                int input_y = y * kernel_size + j;
+
+                int input_idx = c * input_height * input_width + input_y * input_width + input_x;
+                sum += input[input_idx];
             }
         }
 
-        int output_index = c * outputHeight * outputWidth + h * outputWidth + w;
-        output[output_index] = sum / 4.0f;  // avg of 4 pixels
+        int output_idx = c * output_height * output_width + y * output_width + x;
+        output[output_idx] = sum / (kernel_size * kernel_size);  // Average
     }
 }
 
@@ -181,12 +189,14 @@ __global__ void convolve_multichannel(float *input, float *kernels, float *outpu
         for (int i_c = 0; i_c < input_channels; i_c++) {
             for (int kh = 0; kh < kernel_size; kh++) {
                 for (int kw = 0; kw < kernel_size; kw++) {
-                    int y = h + kh;  
+                    int y = h + kh;
                     int x = w + kw;
                     int input_idx = i_c * input_height * input_width + y * input_width + x;
                     int kernel_idx = o_c * input_channels * kernel_size * kernel_size +
-                                     i_c * kernel_size * kernel_size + kh * kernel_size + kw;
-                    sum += input[input_idx] * kernels[kernel_idx];
+                                    i_c * kernel_size * kernel_size + kh * kernel_size + kw;
+                    if (input_idx < input_channels * input_height * input_width && kernel_idx < output_channels * input_channels * kernel_size * kernel_size) {
+                        sum += input[input_idx] * kernels[kernel_idx];
+                    }
                 }
             }
         }
@@ -210,7 +220,7 @@ __global__ void flatten(float *input, float *output, int width, int height, int 
 void PrintFlattenedOutput(float *data, int size) {
     for (int i = 0; i < size; i++) {
         printf("%f ", data[i]);
-        if ((i + 1) % 14 == 0) {  // Saut de ligne après 14 éléments
+        if ((i + 1) % 14 == 0) {  // Line break after 14 elements
             printf("\n");
         }
     }
@@ -218,15 +228,15 @@ void PrintFlattenedOutput(float *data, int size) {
 }
 
 __global__ void dense(float *input, float *weights, float *biases, float *output, int inputSize, int outputSize) {
-    int o = blockIdx.x * blockDim.x + threadIdx.x;  // index de sortie
+    int o = blockIdx.x * blockDim.x + threadIdx.x;  // output index
 
     if (o < outputSize) {
-        float sum = biases[o];  // Initialise avec le biais
+        float sum = biases[o];  // Initialize with bias
         for (int i = 0; i < inputSize; i++) {
-            int weight_index = o * inputSize + i;  // Accès aux poids
+            int weight_index = o * inputSize + i;  // Access weights
             sum += input[i] * weights[weight_index];
         }
-        output[o] = sum;  // Résultat final
+        output[o] = sum;  // Final result
     }
 }
 
@@ -237,48 +247,31 @@ __global__ void apply_activation_tanh(float *data, int size) {
     }
 }
 
-/*
-__device__ float activation_softmax(float *input, int idx, int length) {
-    // Calcul du maximum pour la stabilité numérique
-    float max_val = input[0];
-    for (int i = 1; i < length; i++) {
-        max_val = fmaxf(max_val, input[i]);
-    }
-
-    // Calcul exp + sum
-    float exp_sum = 0.0f;
-    for (int i = 0; i < length; i++) {
-        input[i] = expf(input[i] - max_val); // Décalage pour la stabilité
-        exp_sum += input[i];
-    }
-
-    // Normalisation
-    return input[idx] / exp_sum;
-}
-
-__global__ void apply_activation_softmax(float *data, int size, int length) {
+__global__ void apply_activation_softmax(float *data, int size) {
     int idx = blockIdx.x * blockDim.x + threadIdx.x;
+    
     if (idx < size) {
-        data[idx] = activation_softmax(data, idx, length);
+        // Step 1: Find the maximum value
+        float max_val = data[0];
+        for (int i = 1; i < size; i++) {
+            if (data[i] > max_val) {
+                max_val = data[i];
+            }
+        }
+
+        // Step 2: Subtract the maximum value to avoid overflows
+        float exp_sum = 0.0f;
+        float exp_val = expf(data[idx] - max_val);
+        
+        // Calculate the sum of exponentials
+        for (int i = 0; i < size; i++) {
+            exp_sum += expf(data[i] - max_val);
+        }
+
+        // Step 3: Apply normalization
+        data[idx] = exp_val / exp_sum;
     }
 }
-*/
-
-void softmax(float *input, int size, float *output) {
-    float max_val = input[0];
-    for (int i = 1; i < size; i++) {
-        if (input[i] > max_val) max_val = input[i];
-    }
-    float sum_exp = 0.0f;
-    for (int i = 0; i < size; i++) {
-        output[i] = expf(input[i] - max_val);
-        sum_exp += output[i];
-    }
-    for (int i = 0; i < size; i++) {
-        output[i] /= sum_exp;
-    }
-}
-
 
 // PRINT IMG
 void charBckgrndPrint(char *str, int rgb[3]){
@@ -304,11 +297,11 @@ void loadMNIST(float *data, const char *filename, int imgIdx, int rows, int cols
         exit(1);
     }
 
-    fseek(fptr, 16 + imgIdx * rows * cols, SEEK_SET);  // Offset pour aller à l'image imgIdx
+    fseek(fptr, 16 + imgIdx * rows * cols, SEEK_SET);  // Offset to the imgIdx image
     unsigned char pixel;
     for (int i = 0; i < rows * cols; i++) {
         fread(&pixel, sizeof(unsigned char), 1, fptr);
-        data[i] = (float)pixel / 255.0f;  // Normalise les valeurs entre 0 et 1
+        data[i] = (float)pixel / 255.0f;  // Normalize values between 0 and 1
     }
 
     fclose(fptr);
@@ -337,7 +330,6 @@ void load_biases(const char *filename, float *biases, size_t size) {
 }
 
 
-
 int main(int argc, char *argv[]) {
     // ---- Dimensions ----
     const int INPUT_SIZE = 28 * 28;
@@ -345,10 +337,10 @@ int main(int argc, char *argv[]) {
     const int S2_OUTPUT_SIZE = 14 * 14 * 6; // Pooling -> (14, 14, 6)
     const int C3_OUTPUT_SIZE = 10 * 10 * 16; // Conv2D -> (10, 10, 16)
     const int S4_OUTPUT_SIZE = 5 * 5 * 16; // Pooling -> (5, 5, 16)
-    const int FLATTEN_SIZE = 5 * 5 * 16; // Après flatten (1D)
-    const int F5_OUTPUT_SIZE = 120; // Dense vers 120
-    const int F6_OUTPUT_SIZE = 84; // Dense vers 84
-    const int FINAL_OUTPUT_SIZE = 10; // Dense vers 10 (sortie)
+    const int FLATTEN_SIZE = 5 * 5 * 16; // After flattening (1D)
+    const int F5_OUTPUT_SIZE = 120; // Dense layer to 120
+    const int F6_OUTPUT_SIZE = 84; // Dense layer to 84
+    const int FINAL_OUTPUT_SIZE = 10; // Dense layer to 10 (output)
     init_layers();
 
     // ---- Allocate memory ----
@@ -374,20 +366,22 @@ int main(int argc, char *argv[]) {
     srand(time(NULL));
 
     // Load weights and biases
-    load_weights("conv1_weights.dat", C1_kernel, 6 * 5 * 5);  // Poids de C1
-    load_biases("conv1_biases.dat", F5_biases, 6);  // Biais de C1
+    load_weights("conv1_weights.dat", C1_kernel, 6 * 5 * 5);
+    load_biases("conv1_biases.dat", F5_biases, 6);
 
-    load_weights("conv3_weights.dat", C3_kernel, 16 * 6 * 5 * 5);  // Poids de C3
-    load_biases("conv3_biases.dat", F5_biases, 16);  // Biais de C3
+    load_weights("conv3_weights.dat", C3_kernel, 16 * 6 * 5 * 5);
+    load_biases("conv3_biases.dat", F5_biases, 16);
 
-    load_weights("dense_c5_weights.dat", F5_weights, F5_OUTPUT_SIZE * FLATTEN_SIZE);  // Poids de C5
-    load_biases("dense_c5_biases.dat", F5_biases, F5_OUTPUT_SIZE);  // Biais de C5
+    load_weights("dense_c5_weights.dat", F5_weights, F5_OUTPUT_SIZE * FLATTEN_SIZE);
+    load_biases("dense_c5_biases.dat", F5_biases, F5_OUTPUT_SIZE);
 
-    load_weights("dense_f6_weights.dat", F6_weights, F6_OUTPUT_SIZE * F5_OUTPUT_SIZE);  // Poids de F6
-    load_biases("dense_f6_biases.dat", F6_biases, F6_OUTPUT_SIZE);  // Biais de F6
+    load_weights("dense_f6_weights.dat", F6_weights, F6_OUTPUT_SIZE * F5_OUTPUT_SIZE);
+    load_biases("dense_f6_biases.dat", F6_biases, F6_OUTPUT_SIZE);
 
-    load_weights("dense_output_weights.dat", FINAL_weights, FINAL_OUTPUT_SIZE * F6_OUTPUT_SIZE);  // Poids de la sortie
-    load_biases("dense_output_biases.dat", FINAL_biases, FINAL_OUTPUT_SIZE);  // Biais de la sortie
+    load_weights("dense_output_weights.dat", FINAL_weights, FINAL_OUTPUT_SIZE * F6_OUTPUT_SIZE);
+    load_biases("dense_output_biases.dat", FINAL_biases, FINAL_OUTPUT_SIZE);
+
+    // Print the first 10 elements of C1_kernel as an example
     for (int i = 0; i < 10; i++) {
         printf("%f ", C1_kernel[i]);
     }
@@ -401,16 +395,16 @@ int main(int argc, char *argv[]) {
     float *mnistImage = (float *)malloc(WIDTH * HEIGHT * sizeof(float));
 
     FILE *fptr;
-    int indice_img = 0; // Par défaut, première image
+    int indice_img = 0; // By default, first picture
     unsigned int magic, nbImg, nbRows, nbCols;
     unsigned char val;
 
-    // ---- Vérifiez les arguments ----
+    // ---- Load image from MNIST dataset ----
     if (argc > 1) {
-        indice_img = atoi(argv[1]); // Charger l'image d'indice donné en argument
+        indice_img = atoi(argv[1]); // Get the image index from the command line
     }
 
-    // ---- Allocation dynamique pour img ----
+    // ---- Memory allocation for the image ----
     int ***img = (int ***)malloc(HEIGHT * sizeof(int **));
     for (int i = 0; i < HEIGHT; i++) {
         img[i] = (int **)malloc(WIDTH * sizeof(int *));
@@ -419,35 +413,32 @@ int main(int argc, char *argv[]) {
         }
     }
 
-    // ---- Ouvrir le fichier MNIST ----
+    // ---- Open the MNIST file ----
     if ((fptr = fopen("train-images.idx3-ubyte", "rb")) == NULL) {
         printf("Error: Cannot open file.\n");
         exit(1);
     }
 
-    // ---- Lire l'en-tête MNIST ----
+    // ---- Read the MNIST file ----
     fread(&magic, sizeof(int), 1, fptr);
     fread(&nbImg, sizeof(int), 1, fptr);
     fread(&nbRows, sizeof(int), 1, fptr);
     fread(&nbCols, sizeof(int), 1, fptr);
 
-    // ---- Positionner le curseur pour lire l'image spécifiée ----
+    // ---- Position the cursor to read the specified image ----
     fseek(fptr, 16 + indice_img * WIDTH * HEIGHT, SEEK_SET);
 
-    // ---- Lire l'image en niveaux de gris et remplir img ----
+    // ---- Read the grayscale image and fill img ----
     for (int i = 0; i < HEIGHT; i++) {
         for (int j = 0; j < WIDTH; j++) {
-            fread(&val, sizeof(unsigned char), 1, fptr); // Lire la valeur d'un pixel
-            img[i][j][0] = img[i][j][1] = img[i][j][2] = (int)val; // Valeurs RGB égales
+            fread(&val, sizeof(unsigned char), 1, fptr); // Read the value of 1 pixel
+            img[i][j][0] = img[i][j][1] = img[i][j][2] = (int)val; // Equal RGB values
         }
     }
 
-    // ---- Afficher l'image ----
+    // ---- Print the image ----
     printf("Input Image:\n");
     imgColorPrint(HEIGHT, WIDTH, img);
-
-
-    
 
 
     // Init for Dense
@@ -467,106 +458,132 @@ int main(int argc, char *argv[]) {
     cudaMalloc(&d_S4_output, S4_OUTPUT_SIZE * sizeof(float));
 
     // Convolution 1 (C1)
-    // Copier les données d'image depuis le CPU vers le GPU
+    // Copy image data from CPU to GPU
     cudaMemcpy(d_raw_data, raw_data, INPUT_SIZE * sizeof(float), cudaMemcpyHostToDevice);
 
     dim3 grid_C1((layers[0].output_width + 15) / 16, (layers[0].output_height + 15) / 16, layers[0].num_channels);
     dim3 block(16, 16);
 
     float *d_C1_kernel;
-    //cudaMalloc(&d_C1_kernel, 6 * 5 * 5 * sizeof(float));  // Allocations pour 6 filtres de taille 5x5
     cudaMalloc(&d_C1_kernel, layers[0].num_channels * layers[0].kernel_size * layers[0].kernel_size * sizeof(float));
 
 
-    // Copier les données du noyau (C1_kernel) depuis le CPU vers le GPU
-    //cudaMemcpy(d_C1_kernel, C1_kernel, 6 * 5 * 5 * sizeof(float), cudaMemcpyHostToDevice);
+    // Copy kernel data (C1_kernel) from CPU to GPU
     cudaMemcpy(d_C1_kernel, C1_kernel, layers[0].num_channels * layers[0].kernel_size * layers[0].kernel_size * sizeof(float), cudaMemcpyHostToDevice);
 
-    // Appel de la fonction de convolution
-    convolve_2D<<<grid_C1, block>>>(d_raw_data, d_C1_kernel, d_C1_output,
-                                layers[0].input_height, layers[0].input_width, 
-                                layers[0].output_height, layers[0].output_width, 
-                                layers[0].kernel_size, layers[0].num_channels);
-
     
-    // Synchronisation pour détecter toute erreur CUDA
+    
+    // ------ Convolution 1 (C1) -------
+    convolve_2D<<<grid_C1, block>>>(d_raw_data, d_C1_kernel, d_C1_output, layers[0].input_height, layers[0].input_width, layers[0].output_height, layers[0].output_width, layers[0].kernel_size, layers[0].num_channels);
     cudaDeviceSynchronize();
 
-    // Appliquer la fonction d'activation tanh sur C1_output
+    // Apply tanh activation function on C1_output
     apply_activation_tanh<<<(layers[0].output_height * layers[0].output_width * layers[0].num_channels + 255) / 256, 256>>>(d_C1_output, layers[0].output_height * layers[0].output_width * layers[0].num_channels);
-
-    // Synchronisation pour s'assurer que le calcul est terminé
     cudaDeviceSynchronize();
     
-    /*
-    // Copier les résultats du GPU vers la mémoire du CPU
-    cudaMemcpy(C1_output, d_C1_output, C1_OUTPUT_SIZE * sizeof(float), cudaMemcpyDeviceToHost);
-    //cudaMemcpy(d_C1_kernel, C1_kernel, layers[0].num_channels * layers[0].kernel_size * layers[0].kernel_size * sizeof(float), cudaMemcpyHostToDevice);
+    /* To debug the output of the convolution C1
+    // Copy results from GPU to CPU memory
+    cudaMemcpy(d_C1_kernel, C1_kernel, layers[0].num_channels * layers[0].kernel_size * layers[0].kernel_size * sizeof(float), cudaMemcpyHostToDevice);
 
-    // Imprimer les résultats après la convolution
+    // Print the results after convolution 1 (C1)
     for (int i = 0; i < 100; i++) {
         printf("C1_output[%d]: %f\n", i, C1_output[i]);
     }
     */
 
-    // Pooling 1 (S2)
-    subsample2D<<<grid_C1, block>>>(d_C1_output, d_S2_output, 
-                                layers[0].output_height, layers[0].output_width, 
-                                layers[1].output_height, layers[1].output_width);
 
-    
-    // Synchronisation pour s'assurer que le calcul sur le GPU est terminé
+    // ------------- Pooling 1 (S2) -------------
+    subsample2D<<<grid_C1, block>>>(d_C1_output, d_S2_output, layers[0].output_height, layers[0].output_width, layers[1].output_height, layers[1].output_width, layers[1].kernel_size);
     cudaDeviceSynchronize();
 
-    
-    // Copier les résultats de la sortie de pooling (S2) depuis le GPU vers le CPU
+    /*
+    // Copy the results from GPU to CPU memory
     cudaMemcpy(S2_output, d_S2_output, layers[1].output_height * layers[1].output_width * layers[1].num_channels * sizeof(float), cudaMemcpyDeviceToHost);
 
-    // Imprimer les résultats après le pooling (S2)
+    // Print the results after pooling 1 (S2)
     for (int i = 0; i < layers[1].output_height * layers[1].output_width * layers[1].num_channels; i++) {
         printf("S2_output[%d]: %f\n", i, S2_output[i]);
     }
+    */
 
-    // Convolution 2 (C3)
+
+    // -------- Convolution 2 (C3) --------
     dim3 grid_C3((layers[2].output_width + 15) / 16, (layers[2].output_height + 15) / 16, layers[2].num_channels);
-    convolve_multichannel<<<grid_C3, block>>>(d_S2_output, C3_kernel, d_C3_output, 
-                                                layers[1].output_height, layers[1].output_width, 
-                                                layers[2].output_height, layers[2].output_width, 
-                                                layers[1].kernel_size, layers[1].num_channels, 
-                                                layers[2].num_channels);
+       
+    float *d_C3_kernel;
+    cudaMalloc(&d_C3_kernel, layers[2].num_channels * layers[1].num_channels * layers[1].kernel_size * layers[1].kernel_size * sizeof(float));
+    cudaMemcpy(d_C3_kernel, C3_kernel, layers[2].num_channels * layers[1].num_channels * layers[1].kernel_size * layers[1].kernel_size * sizeof(float), cudaMemcpyHostToDevice);
 
-    // Synchronisation pour détecter toute erreur CUDA
+    convolve_multichannel<<<grid_C3, block>>>(d_S2_output, d_C3_kernel, d_C3_output, layers[1].output_height, layers[1].output_width, layers[2].kernel_size, layers[1].num_channels, layers[2].num_channels, layers[2].output_height, layers[2].output_width);
+
+    cudaDeviceSynchronize();
+    cudaError_t err = cudaGetLastError();
+    if (err != cudaSuccess) {
+        printf("CUDA Error: %s\n", cudaGetErrorString(err));
+    }
+
+    /*
+    cudaMemcpy(C3_output, d_C3_output, layers[2].output_height * layers[2].output_width * layers[2].num_channels * sizeof(float), cudaMemcpyDeviceToHost);
+                                                
+    // Print the results after convolution 2 (C3)
+    for (int i = 0; i < layers[2].output_height * layers[2].output_width * layers[2].num_channels; i++) {
+        printf("C3_output[%d]: %f\n", i, C3_output[i]);
+    }
+    */                                               
+    
+    cudaDeviceSynchronize();
+
+    // Apply tanh activation function on C3_output
+    apply_activation_tanh<<<(layers[0].output_height * layers[2].output_width * layers[2].num_channels + 255) / 256, 256>>>(d_C3_output, layers[2].output_height * layers[2].output_width * layers[2].num_channels);
     cudaDeviceSynchronize();
     
-    // Pooling 2 (S4)
-    subsample2D<<<grid_C3, block>>>(d_C3_output, d_S4_output, 10, 10, 5, 5);
 
-    // Flatten
-    cudaMemcpy(S4_output, d_S4_output, S4_OUTPUT_SIZE * sizeof(float), cudaMemcpyDeviceToHost);
-    memcpy(flattened, S4_output, FLATTEN_SIZE * sizeof(float));
+    // ------- Pooling 2 (S4) -------
+    dim3 grid_S4((layers[3].output_width + 15) / 16, (layers[3].output_height + 15) / 16, layers[3].num_channels);
+    subsample2D<<<grid_S4, block>>>(d_C3_output, d_S4_output, layers[2].output_height, layers[2].output_width, layers[3].output_height, layers[3].output_width, layers[3].kernel_size);
+
+    cudaMemcpy(S4_output, d_S4_output, layers[3].output_height * layers[3].output_width * layers[3].num_channels * sizeof(float), cudaMemcpyDeviceToHost);
 
     // Fully Connected Layers
-    dense<<<1, 120>>>(flattened, F5_weights, F5_biases, F5_output, FLATTEN_SIZE, F5_OUTPUT_SIZE);
-    dense<<<1, 84>>>(F5_output, F6_weights, F6_biases, F6_output, F5_OUTPUT_SIZE, F6_OUTPUT_SIZE);
-    dense<<<1, 10>>>(F6_output, FINAL_weights, FINAL_biases, FINAL_output, F6_OUTPUT_SIZE, FINAL_OUTPUT_SIZE);
+    int flatten_size = layers[3].output_height * layers[3].output_width * layers[3].num_channels;
+    cudaMemcpy(flattened, S4_output, flatten_size * sizeof(float), cudaMemcpyDeviceToHost);
 
-    // activation softmax
+    // ------- Flatten F5 -------
+    dense<<<1, layers[4].num_neurons>>>(flattened, F5_weights, F5_biases, F5_output, flatten_size, layers[4].num_neurons);
+    apply_activation_tanh<<<(layers[4].num_neurons + 255) / 256, 256>>>(F5_output, layers[4].num_neurons);
+
+    // ------- Flatten F6 -------
+    dense<<<1, layers[5].num_neurons>>>(F5_output, F6_weights, F6_biases, F6_output, layers[4].num_neurons, layers[5].num_neurons);
+    apply_activation_tanh<<<(layers[5].num_neurons + 255) / 256, 256>>>(F6_output, layers[5].num_neurons);
+
+    // ------- Flatten FINAL -------
+    dense<<<1, layers[6].num_neurons>>>(F6_output, FINAL_weights, FINAL_biases, FINAL_output, layers[5].num_neurons, layers[6].num_neurons);
+
+    int num_threads = 256; // Number of threads per bloc
+    int num_blocks = (FINAL_OUTPUT_SIZE + num_threads - 1) / num_threads; // Number of blocks
+
+    apply_activation_softmax<<<num_blocks, num_threads>>>(FINAL_output, FINAL_OUTPUT_SIZE);
+    cudaDeviceSynchronize();
+
+    // Copy the results from the GPU to the CPU
     float *softmax_output = (float *)malloc(FINAL_OUTPUT_SIZE * sizeof(float));
-    softmax(FINAL_output, FINAL_OUTPUT_SIZE, softmax_output);
+    cudaMemcpy(softmax_output, FINAL_output, FINAL_OUTPUT_SIZE * sizeof(float), cudaMemcpyDeviceToHost);
 
-    printf("Output (Probabilities):\n");
+    // Print the results
+    printf("Output (Softmax Probabilities):\n");
     for (int i = 0; i < FINAL_OUTPUT_SIZE; i++) {
         printf("%f ", softmax_output[i]);
     }
     printf("\n");
-    
 
-    // Output
-    printf("Output : \n");
-    for (int i = 0; i < FINAL_OUTPUT_SIZE; i++) printf("%f ", FINAL_output[i]);
-    printf("\n");
+    // Check if the sum of the softmax output is close to 1.0
+    float sum = 0.0f;
+    for (int i = 0; i < FINAL_OUTPUT_SIZE; i++) {
+        sum += softmax_output[i];
+    }
+    printf("Sum of softmax output: %f\n", sum);
 
-    // Free memory
+    // ---- Free memory ----
     for (int i = 0; i < HEIGHT; i++) {
         for (int j = 0; j < WIDTH; j++) {
             free(img[i][j]);
